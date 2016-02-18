@@ -33,7 +33,6 @@ def extract(filename):
                     print 'File: ' + file + ' - Size: ' + str(size) + ' bytes'
 
                     if not os.path.exists(folder):
-                        print 'folder not found'
                         os.makedirs(folder)
 
                     open(os.path.join(folder, file) , 'wb').write(contents)
