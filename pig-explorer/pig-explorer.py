@@ -94,6 +94,10 @@ def explore(filename):
                     print(struct.unpack('<h', model_data[mi:mi + 2])[0])
                     mi += 2
 
+                    x = 0
+                    y = 0
+                    z = 0
+
                     for point in range(0, points):
                         vector = {}
                         vector['x'] = struct.unpack('<i', model_data[mi:mi + 4])[0]
@@ -103,7 +107,19 @@ def explore(filename):
                         vector['z'] = struct.unpack('<i', model_data[mi:mi + 4])[0]
                         mi += 4
 
-                        pp.pprint(vector)
+                        #pp.pprint(vector)
+#                        print '%.5f, %.5f, %.5f,' % (x, y, z)
+
+                        x += float(vector['x']) / 100000
+                        y += float(vector['y']) / 100000
+                        z += float(vector['z']) / 100000
+
+#                        print '%.5f, %.5f, %.5f,' % (x, y, z)
+
+#                        print str(x) + ', ' + str(y), ', ' + str(z)
+
+                print('next: ' + str(struct.unpack('<h', model_data[mi:mi + 2])[0]))
+                mi += 2
 
             pp.pprint(counts)
 
