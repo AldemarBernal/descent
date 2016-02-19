@@ -1,3 +1,4 @@
 *.PIG
 *.pig
-*.files
+*.js
+*.html
