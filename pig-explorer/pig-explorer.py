@@ -1,7 +1,21 @@
+import json
 import os
 import pprint
 import struct
 import sys
+from io import BytesIO
+
+
+#IDTA constants
+IDTA_EOF = 0
+IDTA_DEFPOINTS = 1
+IDTA_FLATPOLY = 2
+IDTA_TMAPPOLY = 3
+IDTA_SORTNORM = 4
+IDTA_RODBM = 5
+IDTA_SUBCALL = 6
+IDTA_DEFP_START = 7
+IDTA_GLOW = 8
 
 
 def show_usage():
@@ -25,7 +39,7 @@ def explore(filename):
             pig.read(offset)
 
             pig_dict['num_polymodels'] = read_integer(pig)
-            print(pig_dict['num_polymodels'])
+#            print(pig_dict['num_polymodels'])
             pig_dict['polymodels'] = {}
 
             for pm_index in range(0, pig_dict['num_polymodels']):
@@ -56,74 +70,33 @@ def explore(filename):
 
 
             for pm_index in range(0, pig_dict['num_polymodels']):
-                pig_dict['polymodels'][pm_index]['model_data'] = pig.read(pig_dict['polymodels'][pm_index]['model_data_size'])
+                pig_dict['polymodels'][pm_index]['model_data_raw'] = pig.read(pig_dict['polymodels'][pm_index]['model_data_size'])
+
+            counts = {0: 0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0}
+
+            for pm_index in range(0, 1):#pig_dict['num_polymodels']):
+#                print('id: ' + str(pm_index))
+
+#                with open('polymodel.tmp', 'w') as output:
+#                    output.write(pig_dict['polymodels'][pm_index]['model_data_raw'])
+
+                tmp = pig_dict['polymodels'][pm_index]['model_data_raw']
+                del pig_dict['polymodels'][pm_index]['model_data_raw']
+
+                mdr = BytesIO(tmp)
 
 
+                md = parse_idta(mdr)
 
 
-#            pp.pprint(pig_dict)
-            print(hex(pig.tell()))
-#            pp.pprint(read_vectors(pig, 10))
+#                pp.pprint(md)
+                pig_dict['polymodels'][pm_index]['model_data'] = md
 
-#            pp.pprint(pig_dict['polymodels'][0]['model_data'])
-            counts = {0: 0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0}
+            return pig_dict
 
-            for pm_index in range(0, pig_dict['num_polymodels']):
-                print(pm_index)
+#            pp.pprint(counts)
 
-#                print(pig_dict['polymodels'][pm_index]['model_data'][:4])
-
-                counts[struct.unpack('<h', pig_dict['polymodels'][pm_index]['model_data'][:2])[0]] += 1
-
-                model_data = pig_dict['polymodels'][pm_index]['model_data']
-                mi = 0
-
-                if (struct.unpack('<h', model_data[:2])[0] == 7):
-                    print('DEFP_START')
-                    print('id:')
-                    print(struct.unpack('<h', model_data[mi:2])[0])
-                    mi += 2
-                    print('n_points:')
-                    points = struct.unpack('<h', model_data[mi:mi + 2])[0]
-                    print(struct.unpack('<h', model_data[mi:mi + 2])[0])
-                    mi += 2
-                    print('former_pts:')
-                    print(struct.unpack('<h', model_data[mi:mi + 2])[0])
-                    mi += 2
-                    print('pad:')
-                    print(struct.unpack('<h', model_data[mi:mi + 2])[0])
-                    mi += 2
-
-                    x = 0
-                    y = 0
-                    z = 0
-
-                    for point in range(0, points):
-                        vector = {}
-                        vector['x'] = struct.unpack('<i', model_data[mi:mi + 4])[0]
-                        mi += 4
-                        vector['y'] = struct.unpack('<i', model_data[mi:mi + 4])[0]
-                        mi += 4
-                        vector['z'] = struct.unpack('<i', model_data[mi:mi + 4])[0]
-                        mi += 4
-
-                        #pp.pprint(vector)
-#                        print '%.5f, %.5f, %.5f,' % (x, y, z)
-
-                        x += float(vector['x']) / 100000
-                        y += float(vector['y']) / 100000
-                        z += float(vector['z']) / 100000
-
-#                        print '%.5f, %.5f, %.5f,' % (x, y, z)
-
-#                        print str(x) + ', ' + str(y), ', ' + str(z)
-
-                print('next: ' + str(struct.unpack('<h', model_data[mi:mi + 2])[0]))
-                mi += 2
-
-            pp.pprint(counts)
-
-
+        return pig_dict
 
 
 def read_byte(file):
@@ -148,6 +121,13 @@ def read_bytes(file, max_submodels):
 
     return dict
 
+def read_shorts(file, max_submodels):
+    dict = {}
+    for index in range(0, max_submodels):
+        dict[index] = read_short(file)
+
+    return dict
+
 def read_integers(file, max_submodels):
     dict = {}
     for index in range(0, max_submodels):
@@ -163,10 +143,125 @@ def read_vectors(file, max_submodels):
 
     return dict
 
+def parse_idta(mdr, offset = 0, level = ''):
+    md = {}
+    md_index = 0
+    pp = pprint.PrettyPrinter(indent = 4)
+
+    mdr.seek(offset)
+    idta = read_short(mdr)
+
+    while idta != IDTA_EOF:
+
+#        print(level)
+#        print('idta:' + str(idta))
+#        print('position: ' + str(mdr.tell()))
+
+        md[md_index] = {'idta': idta}
+
+        if idta == IDTA_DEFPOINTS:
+            md[md_index]['num_points'] = read_short(mdr)
+            md[md_index]['vms_points'] = read_vectors(mdr, md[md_index]['num_points'])
+
+        elif idta == IDTA_FLATPOLY:
+            md[md_index]['num_points'] = read_short(mdr)
+            md[md_index]['vms_vector'] = read_vector(mdr)
+            md[md_index]['vms_normal'] = read_vector(mdr)
+            md[md_index]['color_map'] = read_short(mdr)
+            md[md_index]['pltdx'] = read_shorts(mdr, md[md_index]['num_points'])
+
+            if md[md_index]['num_points'] % 2 == 0:
+                md[md_index]['pad'] = read_short(mdr)
+
+        elif idta == IDTA_TMAPPOLY:
+            md[md_index]['num_points'] = read_short(mdr)
+            md[md_index]['vms_vector'] = read_vector(mdr)
+            md[md_index]['vms_normal'] = read_vector(mdr)
+            md[md_index]['texture'] = read_short(mdr)
+            md[md_index]['pltdx'] = read_shorts(mdr, md[md_index]['num_points'])
+
+            if md[md_index]['num_points'] % 2 == 0:
+                md[md_index]['pad'] = read_short(mdr)
+
+            md[md_index]['uvl_vectors'] = read_vectors(mdr, md[md_index]['num_points'])
+
+        elif idta == IDTA_SORTNORM:
+            md[md_index]['num_points'] = read_short(mdr)
+            md[md_index]['vms_vector'] = read_vector(mdr)
+            md[md_index]['vms_normal'] = read_vector(mdr)
+            md[md_index]['z_front'] = read_short(mdr)
+            md[md_index]['z_back'] = read_short(mdr)
+
+#            pp.pprint(md[md_index])
+
+#            print('offset: ' + str(offset))
+#            print('old: ' + str(mdr.tell()))
+#            print('z_front:' + str(md[md_index]['z_front']))
+#            print('new: ' + str(offset + md[md_index]['z_front']))
+
+            old_offset = mdr.tell()
+            md[md_index]['z_front_nodes'] = parse_idta(mdr, offset + md[md_index]['z_front'], level + '+')
+            mdr.seek(old_offset)
+
+            old_offset = mdr.tell()
+            md[md_index]['z_back_nodes'] = parse_idta(mdr, offset + md[md_index]['z_back'], level + '+')
+            mdr.seek(old_offset)
+
+        elif idta == IDTA_RODBM:
+            md[md_index]['bmp_num'] = read_short(mdr)
+            md[md_index]['vms_top_point'] = read_vector(mdr)
+            md[md_index]['bot_width'] = read_integer(mdr)
+            md[md_index]['vms_bottom_point'] = read_vector(mdr)
+            md[md_index]['top_width'] = read_integer(mdr)
+
+        elif idta == IDTA_SUBCALL:
+            md[md_index]['suboject_num'] = read_short(mdr)
+            md[md_index]['vms_start_point'] = read_vector(mdr)
+            md[md_index]['offset'] = read_short(mdr)
+            md[md_index]['pad'] = read_integer(mdr)
+
+            old_offset = mdr.tell()
+            md[md_index]['offset'] = parse_idta(mdr, offset + md[md_index]['offset'], level + '+')
+            mdr.seek(old_offset)
+
+        elif idta == IDTA_DEFP_START:
+            md[md_index]['num_points'] = read_short(mdr)
+            md[md_index]['former_points'] = read_short(mdr)
+            md[md_index]['pad'] = read_short(mdr)
+            md[md_index]['vms_points'] = read_vectors(mdr, md[md_index]['num_points'])
+
+#            for point, values in md[md_index]['vms_points'].iteritems():
+#                print '%.4f, %.4f, %.4f,' % (float(values['x']) / 100000, float(values['y']) / 100000, float(values['z']) / 100000)
+
+
+        elif idta == IDTA_GLOW:
+            md[md_index]['glow_value'] = read_short(mdr)
+
+        else:
+            raise Exception('oops')
+
+
+#        pp.pprint(md[md_index])
+
+
+#        print('position: ' + str(mdr.tell()))
+
+        offset = mdr.tell()
+
+
+        idta = read_short(mdr)
+#        print('next idta: ' + str(idta))
+        md_index += 1
+
+
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         show_usage()
     else:
-        explore(sys.argv[1])
+        pig = explore(sys.argv[1])
+
+        print(pig)
+#        with open(sys.argv[1] + '.json', 'w') as output:
+#            json.dump(pig, output)

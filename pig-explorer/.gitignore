@@ -1,4 +1,8 @@
+.DS_Store
 *.PIG
 *.pig
 *.js
 *.html
+*.json
+*.tmp
+web-gl-tests/*
