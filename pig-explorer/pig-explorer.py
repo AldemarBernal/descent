@@ -39,8 +39,8 @@ def explore(filename):
             pig.read(offset)
 
             pig_dict['num_polymodels'] = read_integer(pig)
-#            print(pig_dict['num_polymodels'])
             pig_dict['polymodels'] = {}
+            models_raw = {}
 
             for pm_index in range(0, pig_dict['num_polymodels']):
                 polymodel = {}
@@ -70,31 +70,15 @@ def explore(filename):
 
 
             for pm_index in range(0, pig_dict['num_polymodels']):
-                pig_dict['polymodels'][pm_index]['model_data_raw'] = pig.read(pig_dict['polymodels'][pm_index]['model_data_size'])
+                models_raw[pm_index] = pig.read(pig_dict['polymodels'][pm_index]['model_data_size'])
 
             counts = {0: 0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0}
 
-            for pm_index in range(0, 1):#pig_dict['num_polymodels']):
-#                print('id: ' + str(pm_index))
-
-#                with open('polymodel.tmp', 'w') as output:
-#                    output.write(pig_dict['polymodels'][pm_index]['model_data_raw'])
-
-                tmp = pig_dict['polymodels'][pm_index]['model_data_raw']
-                del pig_dict['polymodels'][pm_index]['model_data_raw']
-
-                mdr = BytesIO(tmp)
-
-
+            for pm_index in range(0, pig_dict['num_polymodels']):
+                print(pig_dict['polymodels'][pm_index])
+                mdr = BytesIO(models_raw[pm_index])
                 md = parse_idta(mdr)
-
-
-#                pp.pprint(md)
                 pig_dict['polymodels'][pm_index]['model_data'] = md
-
-            return pig_dict
-
-#            pp.pprint(counts)
 
         return pig_dict
 
@@ -152,11 +136,6 @@ def parse_idta(mdr, offset = 0, level = ''):
     idta = read_short(mdr)
 
     while idta != IDTA_EOF:
-
-#        print(level)
-#        print('idta:' + str(idta))
-#        print('position: ' + str(mdr.tell()))
-
         md[md_index] = {'idta': idta}
 
         if idta == IDTA_DEFPOINTS:
@@ -192,13 +171,6 @@ def parse_idta(mdr, offset = 0, level = ''):
             md[md_index]['z_front'] = read_short(mdr)
             md[md_index]['z_back'] = read_short(mdr)
 
-#            pp.pprint(md[md_index])
-
-#            print('offset: ' + str(offset))
-#            print('old: ' + str(mdr.tell()))
-#            print('z_front:' + str(md[md_index]['z_front']))
-#            print('new: ' + str(offset + md[md_index]['z_front']))
-
             old_offset = mdr.tell()
             md[md_index]['z_front_nodes'] = parse_idta(mdr, offset + md[md_index]['z_front'], level + '+')
             mdr.seek(old_offset)
@@ -221,8 +193,10 @@ def parse_idta(mdr, offset = 0, level = ''):
             md[md_index]['pad'] = read_integer(mdr)
 
             old_offset = mdr.tell()
-            md[md_index]['offset'] = parse_idta(mdr, offset + md[md_index]['offset'], level + '+')
+            md[md_index]['subcall'] = parse_idta(mdr, offset + md[md_index]['offset'], level + '+')
             mdr.seek(old_offset)
+
+            #print('//%.5f, %.5f, %.5f,' % (float(md[md_index]['vms_start_point']['x']) / 100000, float(md[md_index]['vms_start_point']['y']) / 100000, float(md[md_index]['vms_start_point']['z']) / 100000,))
 
         elif idta == IDTA_DEFP_START:
             md[md_index]['num_points'] = read_short(mdr)
@@ -230,8 +204,9 @@ def parse_idta(mdr, offset = 0, level = ''):
             md[md_index]['pad'] = read_short(mdr)
             md[md_index]['vms_points'] = read_vectors(mdr, md[md_index]['num_points'])
 
-#            for point, values in md[md_index]['vms_points'].iteritems():
-#                print '%.4f, %.4f, %.4f,' % (float(values['x']) / 100000, float(values['y']) / 100000, float(values['z']) / 100000)
+            #print('// ' + level + ' - ' + str(md[md_index]['former_points']))
+            #for key, value in md[md_index]['vms_points'].iteritems():
+            #    print('%.5f, %.5f, %.5f,' % (float(value['x']) / 100000, float(value['y']) / 100000, float(value['z']) / 100000,))
 
 
         elif idta == IDTA_GLOW:
@@ -240,19 +215,11 @@ def parse_idta(mdr, offset = 0, level = ''):
         else:
             raise Exception('oops')
 
-
-#        pp.pprint(md[md_index])
-
-
-#        print('position: ' + str(mdr.tell()))
-
         offset = mdr.tell()
-
-
         idta = read_short(mdr)
-#        print('next idta: ' + str(idta))
         md_index += 1
 
+    return md
 
 
 if __name__ == "__main__":
@@ -262,6 +229,5 @@ if __name__ == "__main__":
     else:
         pig = explore(sys.argv[1])
 
-        print(pig)
-#        with open(sys.argv[1] + '.json', 'w') as output:
-#            json.dump(pig, output)
+        with open(sys.argv[1] + '.json', 'w') as output:
+            json.dump(pig, output)
