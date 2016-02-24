@@ -27,16 +27,25 @@ def get_model(filename, id):
     with open(filename, 'rb') as models_file:
         models = json.load(models_file)
 
-        for id in range(0, 50):
-            model = models['polymodels'][str(id)]
+#        for id in range(0, 10):
+        model = models['polymodels'][str(id)]
 
-            points = parse_idta(model['model_data'])
-            print('models:' + str(model['num_models']) + '-' + str(len(points)))
-#        print(points)
+        points = parse_idta(model['model_data'])
+        print('models:' + str(model['num_models']) + '-' + str(len(points)))
 
-#        for md in points:
-#            print md5.new(json.dumps(md)).hexdigest()
-#            print md
+        for key in range(0, model['num_models']):
+            print('//submodel: ' + str(key))
+            for point_key, point in points[key].iteritems():
+                x = point['x'] - model['submodel']['offsets'][str(key)]['x']
+                y = point['y'] + model['submodel']['offsets'][str(key)]['y']
+                z = point['z'] - model['submodel']['offsets'][str(key)]['z']
+
+                x = float(x) / 100000
+                y = float(y) / 100000
+                z = float(z) / 100000
+
+                print('%.5f, %.5f, %.5f,' % (x, y, z))
+
 
 def parse_idta(model, hashes = []):
     points = []
