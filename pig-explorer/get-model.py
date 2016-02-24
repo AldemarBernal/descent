@@ -1,7 +1,7 @@
 import json
-import md5
 import os
 import sys
+from collections import OrderedDict
 
 
 #IDTA constants
@@ -25,20 +25,18 @@ def get_model(filename, id):
         print filename + ' not found'
 
     with open(filename, 'rb') as models_file:
-        models = json.load(models_file)
-
-#        for id in range(0, 10):
+        models = json.load(models_file, object_pairs_hook = OrderedDict)
         model = models['polymodels'][str(id)]
 
-        points = parse_idta(model['model_data'])
-        print('models:' + str(model['num_models']) + '-' + str(len(points)))
-
         for key in range(0, model['num_models']):
+            md = model['model_data'][str(key)]
+            points = parse_idta(md)
+
             print('//submodel: ' + str(key))
-            for point_key, point in points[key].iteritems():
-                x = point['x'] - model['submodel']['offsets'][str(key)]['x']
+            for point in points:
+                x = point['x'] + model['submodel']['offsets'][str(key)]['x']
                 y = point['y'] + model['submodel']['offsets'][str(key)]['y']
-                z = point['z'] - model['submodel']['offsets'][str(key)]['z']
+                z = point['z'] + model['submodel']['offsets'][str(key)]['z']
 
                 x = float(x) / 100000
                 y = float(y) / 100000
@@ -47,7 +45,7 @@ def get_model(filename, id):
                 print('%.5f, %.5f, %.5f,' % (x, y, z))
 
 
-def parse_idta(model, hashes = []):
+def parse_idta(model):
     points = []
     more_points = None
 
@@ -59,26 +57,33 @@ def parse_idta(model, hashes = []):
         elif idta == IDTA_FLATPOLY:
             pass
         elif idta == IDTA_TMAPPOLY:
+            for key_point, point in md['uvl_vectors'].iteritems():
+                uvl = point
+#                uvl['x'] += md['vms_vector']['x']
+#                uvl['y'] += md['vms_vector']['y']
+#                uvl['z'] += md['vms_vector']['z']
+
+#                points.append(point)
+
             pass
         elif idta == IDTA_SORTNORM:
-            for pts in parse_idta(md['z_front_nodes'], hashes):
+            for pts in parse_idta(md['z_front_nodes']):
                 points.append(pts)
 
-            for pts in parse_idta(md['z_back_nodes'], hashes):
+            for pts in parse_idta(md['z_back_nodes']):
                 points.append(pts)
 
         elif idta == IDTA_RODBM:
             pass
         elif idta == IDTA_SUBCALL:
 
-            for pts in parse_idta(md['subcall'], hashes):
+            for pts in parse_idta(md['subcall']):
                 points.append(pts)
 
         elif idta == IDTA_DEFP_START:
-            md5_points = md5.new(json.dumps(md)).hexdigest()
-            if md5_points not in hashes:
-                hashes.append(md5_points)
-                points.append(md['vms_points'])
+            for key_point, point in md['vms_points'].iteritems():
+                points.append(point)
+#                pass
 
         elif idta == IDTA_GLOW:
             pass

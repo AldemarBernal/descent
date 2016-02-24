@@ -3,6 +3,7 @@ import os
 import pprint
 import struct
 import sys
+from collections import OrderedDict
 from io import BytesIO
 
 
@@ -30,7 +31,7 @@ def explore(filename):
         #polymodel data offset
         offset = 0xF13A - 8
         max_submodels = 10
-        pig_dict = {}
+        pig_dict = OrderedDict()
         pp = pprint.PrettyPrinter(indent = 4)
 
         with open(filename, 'rb') as pig:
@@ -39,17 +40,17 @@ def explore(filename):
             pig.read(offset)
 
             pig_dict['num_polymodels'] = read_integer(pig)
-            pig_dict['polymodels'] = {}
-            models_raw = {}
+            pig_dict['polymodels'] = OrderedDict()
+            models_raw = OrderedDict()
 
             for pm_index in range(0, pig_dict['num_polymodels']):
-                polymodel = {}
+                polymodel = OrderedDict()
 
                 polymodel['num_models'] = read_integer(pig)
                 polymodel['model_data_size'] = read_integer(pig)
                 polymodel['model_data'] = read_integer(pig)
 
-                polymodel['submodel'] = {}
+                polymodel['submodel'] = OrderedDict()
                 polymodel['submodel']['ptrs'] = read_integers(pig, max_submodels)
                 polymodel['submodel']['offsets'] = read_vectors(pig, max_submodels)
                 polymodel['submodel']['norms'] = read_vectors(pig, max_submodels)
@@ -68,16 +69,21 @@ def explore(filename):
 
                 pig_dict['polymodels'][pm_index] = polymodel
 
-
             for pm_index in range(0, pig_dict['num_polymodels']):
                 models_raw[pm_index] = pig.read(pig_dict['polymodels'][pm_index]['model_data_size'])
 
             counts = {0: 0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0}
 
             for pm_index in range(0, pig_dict['num_polymodels']):
-                print(pig_dict['polymodels'][pm_index])
+#                print(pig_dict['polymodels'][pm_index])
+                md = OrderedDict()
                 mdr = BytesIO(models_raw[pm_index])
-                md = parse_idta(mdr)
+#                md = parse_idta(mdr)
+#                pig_dict['polymodels'][pm_index]['model_data'] = md
+
+                for submodel in range(0, pig_dict['polymodels'][pm_index]['num_models']):
+                    md[submodel] = parse_idta(mdr, pig_dict['polymodels'][pm_index]['submodel']['ptrs'][submodel])
+
                 pig_dict['polymodels'][pm_index]['model_data'] = md
 
         return pig_dict
@@ -93,42 +99,42 @@ def read_integer(file):
     return struct.unpack('<i', file.read(4))[0]
 
 def read_vector(file):
-    return {
-        'x': read_integer(file),
-        'y': read_integer(file),
-        'z': read_integer(file)}
+    vector = OrderedDict()
+    vector['x'] = read_integer(file)
+    vector['y'] = read_integer(file)
+    vector['z'] = read_integer(file)
+    return vector
 
 def read_bytes(file, max_submodels):
-    dict = {}
+    dict = OrderedDict()
     for index in range(0, max_submodels):
         dict[index] = read_byte(file)
 
     return dict
 
 def read_shorts(file, max_submodels):
-    dict = {}
+    dict = OrderedDict()
     for index in range(0, max_submodels):
         dict[index] = read_short(file)
 
     return dict
 
 def read_integers(file, max_submodels):
-    dict = {}
+    dict = OrderedDict()
     for index in range(0, max_submodels):
         dict[index] = read_integer(file)
 
     return dict
 
 def read_vectors(file, max_submodels):
-    dict = {}
-
+    dict = OrderedDict()
     for index in range(0, max_submodels):
         dict[index] = read_vector(file)
 
     return dict
 
 def parse_idta(mdr, offset = 0, level = ''):
-    md = {}
+    md = OrderedDict()
     md_index = 0
     pp = pprint.PrettyPrinter(indent = 4)
 
@@ -136,7 +142,8 @@ def parse_idta(mdr, offset = 0, level = ''):
     idta = read_short(mdr)
 
     while idta != IDTA_EOF:
-        md[md_index] = {'idta': idta}
+        md[md_index] = OrderedDict()
+        md[md_index]['idta'] = idta
 
         if idta == IDTA_DEFPOINTS:
             md[md_index]['num_points'] = read_short(mdr)
