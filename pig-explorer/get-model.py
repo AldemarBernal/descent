@@ -28,12 +28,16 @@ def get_model(filename, id):
         models = json.load(models_file, object_pairs_hook = OrderedDict)
         model = models['polymodels'][str(id)]
 
+        former_points = 0
         for key in range(0, model['num_models']):
             md = model['model_data'][str(key)]
-            points = parse_idta(md)
+            points = parse_idta_points(md)
+            indexes = parse_idta_indexes(md)
 
             print('//submodel: ' + str(key))
-            for point in points:
+            for index in indexes:
+                point = points[index - former_points]
+
                 x = point['x'] + model['submodel']['offsets'][str(key)]['x']
                 y = point['y'] + model['submodel']['offsets'][str(key)]['y']
                 z = point['z'] + model['submodel']['offsets'][str(key)]['z']
@@ -45,52 +49,90 @@ def get_model(filename, id):
                 print('%.5f, %.5f, %.5f,' % (x, y, z))
 
 
-def parse_idta(model):
+            former_points += len(points)
+
+def parse_idta_points(model):
     points = []
-    more_points = None
 
     for key, md in model.iteritems():
         idta = md['idta']
 
         if idta == IDTA_DEFPOINTS:
             pass
+
         elif idta == IDTA_FLATPOLY:
             pass
+
         elif idta == IDTA_TMAPPOLY:
-            for key_point, point in md['uvl_vectors'].iteritems():
-                uvl = point
-#                uvl['x'] += md['vms_vector']['x']
-#                uvl['y'] += md['vms_vector']['y']
-#                uvl['z'] += md['vms_vector']['z']
-
-#                points.append(point)
-
             pass
+
         elif idta == IDTA_SORTNORM:
-            for pts in parse_idta(md['z_front_nodes']):
+            for pts in parse_idta_points(md['z_front_nodes']):
                 points.append(pts)
 
-            for pts in parse_idta(md['z_back_nodes']):
+            for pts in parse_idta_points(md['z_back_nodes']):
                 points.append(pts)
 
         elif idta == IDTA_RODBM:
             pass
-        elif idta == IDTA_SUBCALL:
 
-            for pts in parse_idta(md['subcall']):
+        elif idta == IDTA_SUBCALL:
+            for pts in parse_idta_points(md['subcall']):
                 points.append(pts)
 
         elif idta == IDTA_DEFP_START:
             for key_point, point in md['vms_points'].iteritems():
                 points.append(point)
-#                pass
 
         elif idta == IDTA_GLOW:
             pass
+
         else:
             raise Exception('oops')
 
     return points
+
+def parse_idta_indexes(model):
+    indexes = []
+
+    for key, md in model.iteritems():
+        idta = md['idta']
+
+        if idta == IDTA_DEFPOINTS:
+            pass
+
+        elif idta == IDTA_FLATPOLY:
+            for index in md['pltdx'].itervalues():
+                indexes.append(index)
+
+        elif idta == IDTA_TMAPPOLY:
+            for index in md['pltdx'].itervalues():
+                indexes.append(index)
+
+        elif idta == IDTA_SORTNORM:
+            for index in parse_idta_indexes(md['z_front_nodes']):
+                indexes.append(index)
+
+            for index in parse_idta_indexes(md['z_back_nodes']):
+                indexes.append(index)
+
+        elif idta == IDTA_RODBM:
+            pass
+
+        elif idta == IDTA_SUBCALL:
+            for index in parse_idta_indexes(md['subcall']):
+                indexes.append(index - last_num_models)
+
+        elif idta == IDTA_DEFP_START:
+                pass
+
+        elif idta == IDTA_GLOW:
+            pass
+
+        else:
+            raise Exception('oops')
+
+    return indexes
 
 
 if __name__ == "__main__":
