@@ -45,24 +45,28 @@ def rdl_read(filename):
                 objectsOffset = read_integer(rdl)
                 fileSize = read_integer(rdl)
 
-                print('version: ' + str(version))
-                print('mine data offset: ' + str(mineDataOffset))
-                print('objects offset: ' + str(objectsOffset))
-                print('file size: ' + str(fileSize))
+#                print('version: ' + str(version))
+#                print('mine data offset: ' + str(mineDataOffset))
+#                print('objects offset: ' + str(objectsOffset))
+#                print('file size: ' + str(fileSize))
 
                 mineData = get_mine_data(rdl, mineDataOffset)
 
+                print(json.dumps(mineData, indent = 4))
+
 
 def get_mine_data(rdl, offset):
+    mine = OrderedDict()
+
     rdl.seek(offset)
 
     version = read_ubyte(rdl)
     vertexCount = read_short(rdl)
     cubeCount = read_short(rdl)
 
-    print('compiled version: ' + str(version))
-    print('vertex count: ' + str(vertexCount))
-    print('cube count: ' + str(cubeCount))
+#    print('compiled version: ' + str(version))
+#    print('vertex count: ' + str(vertexCount))
+#    print('cube count: ' + str(cubeCount))
 
     vertices = read_vectors(rdl, vertexCount)
 
@@ -70,9 +74,9 @@ def get_mine_data(rdl, offset):
 #        print(str(ptr) + ':\t' + str(vertex['x']) + '\t' + str(vertex['y'])  + '\t' + str(vertex['z']))
 
 
-    cubes = []
+    cubes = OrderedDict()
     for cubeIndex in range(0, cubeCount):
-        print rdl.tell()
+#        print rdl.tell()
 
         cube = OrderedDict()
 
@@ -80,23 +84,9 @@ def get_mine_data(rdl, offset):
         if bitmask:
             cube['attached_cubes'] = OrderedDict()
 
-            if bitmask & RDL_LEFT_SIDE:
-                cube['attached_cubes']['left_side'] = read_short(rdl)
-
-            if bitmask & RDL_TOP_SIDE:
-                cube['attached_cubes']['top_side'] = read_short(rdl)
-
-            if bitmask & RDL_RIGHT_SIDE:
-                cube['attached_cubes']['right_side'] = read_short(rdl)
-
-            if bitmask & RDL_BOTTOM_SIDE:
-                cube['attached_cubes']['bottom_side'] = read_short(rdl)
-
-            if bitmask & RDL_BACK_SIDE:
-                cube['attached_cubes']['back_side'] = read_short(rdl)
-
-            if bitmask & RDL_FRONT_SIDE:
-                cube['attached_cubes']['front_side'] = read_short(rdl)
+            for side in RDL_SIDES:
+                if bitmask & side:
+                    cube['attached_cubes'][RDL_SIDES_TEXT[side]] = read_short(rdl)
 
 
         cube['vertices'] = []
@@ -117,52 +107,44 @@ def get_mine_data(rdl, offset):
         if wall_bitmask:
             cube['walls'] = OrderedDict()
 
-            if wall_bitmask & RDL_LEFT_SIDE:
-                cube['walls']['left_side'] = read_ubyte(rdl)
-
-            if wall_bitmask & RDL_TOP_SIDE:
-                cube['walls']['top_side'] = read_ubyte(rdl)
-
-            if wall_bitmask & RDL_RIGHT_SIDE:
-                cube['walls']['right_side'] = read_ubyte(rdl)
-
-            if wall_bitmask & RDL_BOTTOM_SIDE:
-                cube['walls']['bottom_side'] = read_ubyte(rdl)
-
-            if wall_bitmask & RDL_BACK_SIDE:
-                cube['walls']['back_side'] = read_ubyte(rdl)
-
-            if wall_bitmask & RDL_FRONT_SIDE:
-                cube['walls']['front_side'] = read_ubyte(rdl)
+            for side in RDL_SIDES:
+                if wall_bitmask & side:
+                    cube['walls'][RDL_SIDES_TEXT[side]] = read_ubyte(rdl)
 
 
         cube['textures'] = OrderedDict()
 
         for side in RDL_SIDES:
             if not (bitmask & side) or (wall_bitmask & side):
-                texture = read_ushort(rdl)
-                cube['textures'][RDL_SIDES_TEXT[side]] = OrderedDict()
-                cube['textures'][RDL_SIDES_TEXT[side]]['primary'] = texture & 0x7FFF
+#                if cube['attached_cubes'][RDL_SIDES_TEXT[side]] >= 0:
+                    texture = read_ushort(rdl)
+                    cube['textures'][RDL_SIDES_TEXT[side]] = OrderedDict()
+                    cube['textures'][RDL_SIDES_TEXT[side]]['primary'] = texture & 0x7FFF
 
-                if texture & 0x8000:
-                    cube['textures'][RDL_SIDES_TEXT[side]]['secondary'] = read_short(rdl)
+                    if texture & 0x8000:
+                        cube['textures'][RDL_SIDES_TEXT[side]]['secondary'] = read_short(rdl)
 
-                cube['textures'][RDL_SIDES_TEXT[side]]['vertices'] = []
-                for vertexIndex in range(0, 4):
-                    uvl = OrderedDict()
+                    cube['textures'][RDL_SIDES_TEXT[side]]['vertices'] = []
+                    for vertexIndex in range(0, 4):
+                        uvl = OrderedDict()
 
-                    uvl['u'] = float(read_short(rdl)) / 4096.0
-                    uvl['v'] = float(read_short(rdl)) / 4096.0
-                    uvl['l'] = float(read_ushort(rdl)) / 4096.0
+                        uvl['u'] = float(read_short(rdl)) / 4096.0
+                        uvl['v'] = float(read_short(rdl)) / 4096.0
+                        uvl['l'] = float(read_ushort(rdl)) / 4096.0
 
-                    cube['textures'][RDL_SIDES_TEXT[side]]['vertices'].append(uvl)
-
-
-        cubes.append(cube)
-
-        print(json.dumps(cube, indent = 4))
+                        cube['textures'][RDL_SIDES_TEXT[side]]['vertices'].append(uvl)
 
 
+        cubes[cubeIndex] = cube
+
+
+    mine['version'] = version
+    mine['vertex_count'] = vertexCount
+    mine['cube_count'] = cubeCount
+    mine['vertices'] = vertices
+    mine['cubes'] = cubes
+
+    return mine
 
 
 def read_byte(file):
