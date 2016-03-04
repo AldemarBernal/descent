@@ -70,14 +70,8 @@ def get_mine_data(rdl, offset):
 
     vertices = read_vectors(rdl, vertexCount)
 
-#    for ptr, vertex in vertices.items():
-#        print(str(ptr) + ':\t' + str(vertex['x']) + '\t' + str(vertex['y'])  + '\t' + str(vertex['z']))
-
-
     cubes = OrderedDict()
     for cubeIndex in range(0, cubeCount):
-#        print rdl.tell()
-
         cube = OrderedDict()
 
         bitmask = read_byte(rdl)
@@ -87,7 +81,6 @@ def get_mine_data(rdl, offset):
             for side in RDL_SIDES:
                 if bitmask & side:
                     cube['attached_cubes'][RDL_SIDES_TEXT[side]] = read_short(rdl)
-
 
         cube['vertices'] = []
         for index in range(0, 8):
@@ -115,24 +108,23 @@ def get_mine_data(rdl, offset):
         cube['textures'] = OrderedDict()
 
         for side in RDL_SIDES:
-            if not (bitmask & side) or (wall_bitmask & side):
-#                if cube['attached_cubes'][RDL_SIDES_TEXT[side]] >= 0:
-                    texture = read_ushort(rdl)
-                    cube['textures'][RDL_SIDES_TEXT[side]] = OrderedDict()
-                    cube['textures'][RDL_SIDES_TEXT[side]]['primary'] = texture & 0x7FFF
+            if not (bitmask & side) or (wall_bitmask & side) or cube['attached_cubes'][RDL_SIDES_TEXT[side]] < 0:
+                texture = read_ushort(rdl)
+                cube['textures'][RDL_SIDES_TEXT[side]] = OrderedDict()
+                cube['textures'][RDL_SIDES_TEXT[side]]['primary'] = texture & 0x7FFF
 
-                    if texture & 0x8000:
-                        cube['textures'][RDL_SIDES_TEXT[side]]['secondary'] = read_short(rdl)
+                if texture & 0x8000:
+                    cube['textures'][RDL_SIDES_TEXT[side]]['secondary'] = read_short(rdl)
 
-                    cube['textures'][RDL_SIDES_TEXT[side]]['vertices'] = []
-                    for vertexIndex in range(0, 4):
-                        uvl = OrderedDict()
+                cube['textures'][RDL_SIDES_TEXT[side]]['vertices'] = []
+                for vertexIndex in range(0, 4):
+                    uvl = OrderedDict()
 
-                        uvl['u'] = float(read_short(rdl)) / 4096.0
-                        uvl['v'] = float(read_short(rdl)) / 4096.0
-                        uvl['l'] = float(read_ushort(rdl)) / 4096.0
+                    uvl['u'] = float(read_short(rdl)) / 4096.0
+                    uvl['v'] = float(read_short(rdl)) / 4096.0
+                    uvl['l'] = float(read_ushort(rdl)) / 4096.0
 
-                        cube['textures'][RDL_SIDES_TEXT[side]]['vertices'].append(uvl)
+                    cube['textures'][RDL_SIDES_TEXT[side]]['vertices'].append(uvl)
 
 
         cubes[cubeIndex] = cube
