@@ -23,6 +23,23 @@ RDL_SIDES_TEXT = {
     RDL_BACK_SIDE: 'back_side',
     RDL_FRONT_SIDE: 'front_side'}
 
+RDL_THING_ROBOT = 2
+RDL_THING_HOSTAGE = 3
+RDL_THING_START_PLACE = 4
+RDL_THING_MINE = 5
+RDL_THING_ITEM = 7
+RDL_THING_REACTOR = 9
+RDL_THING_COOP_START_PLACE = 14
+
+RDL_THINGS_TEXT = {
+    RDL_THING_ROBOT: 'robots',
+    RDL_THING_HOSTAGE: 'hostages',
+    RDL_THING_START_PLACE: 'start_places',
+    RDL_THING_MINE: 'mines',
+    RDL_THING_ITEM: 'items',
+    RDL_THING_REACTOR: 'reactors',
+    RDL_THING_COOP_START_PLACE: 'coop_start_places'}
+
 
 def show_usage():
     print 'usage: python rdl-reader.py <levelxx.rdl>'
@@ -45,12 +62,22 @@ def rdl_read(filename):
                 objectsOffset = read_integer(rdl)
                 fileSize = read_integer(rdl)
 
-#                print('version: ' + str(version))
-#                print('mine data offset: ' + str(mineDataOffset))
-#                print('objects offset: ' + str(objectsOffset))
-#                print('file size: ' + str(fileSize))
+                #print('version: ' + str(version))
+                #print('mine data offset: ' + str(mineDataOffset))
+                #print('objects offset: ' + str(objectsOffset))
+                #print('file size: ' + str(fileSize))
 
                 mineData = get_mine_data(rdl, mineDataOffset)
+
+                read_byte(rdl)
+
+                noIdeaOffset = read_integer(rdl)
+                numNoIdea = read_integer(rdl)
+
+                thingsOffset = read_integer(rdl)
+                numThings = read_integer(rdl)
+
+                mineData['things'] = get_things_data(rdl, numThings, thingsOffset)
 
                 print(json.dumps(mineData, indent = 4))
 
@@ -64,9 +91,9 @@ def get_mine_data(rdl, offset):
     vertexCount = read_short(rdl)
     cubeCount = read_short(rdl)
 
-#    print('compiled version: ' + str(version))
-#    print('vertex count: ' + str(vertexCount))
-#    print('cube count: ' + str(cubeCount))
+    #print('compiled version: ' + str(version))
+    #print('vertex count: ' + str(vertexCount))
+    #print('cube count: ' + str(cubeCount))
 
     vertices = read_vectors(rdl, vertexCount)
 
@@ -131,16 +158,100 @@ def get_mine_data(rdl, offset):
 
 
     mine['version'] = version
-    mine['vertex_count'] = vertexCount
-    mine['cube_count'] = cubeCount
+    #mine['vertex_count'] = vertexCount
+    #mine['cube_count'] = cubeCount
     mine['vertices'] = vertices
     mine['cubes'] = cubes
 
     return mine
 
 
+def get_things_data(rdl, numThings, offset):
+    things = OrderedDict()
+
+    rdl.seek(offset)
+
+    for idThing in range(0, numThings):
+        type = read_byte(rdl)
+
+        thingType = read_byte(rdl)
+        thing = get_things_common(rdl)
+
+        if RDL_THINGS_TEXT[type] not in things:
+            things[RDL_THINGS_TEXT[type]] = []
+
+        if type == RDL_THING_ROBOT:
+            dropType = read_byte(rdl)
+            dropTypeId = read_byte(rdl)
+            dropCount = read_byte(rdl)
+            unknown = read_integer(rdl)
+            textureOverride = read_byte(rdl)
+            unknown = read_bytes(rdl, 155)
+
+            thing['type'] = thingType
+            thing['drop_type'] = dropType
+            thing['drop_type_id'] = dropTypeId
+            thing['drop_count'] = dropCount
+            thing['texture_override'] = textureOverride
+
+        elif type == RDL_THING_HOSTAGE:
+            unknown = read_bytes(rdl, 16)
+
+        elif type == RDL_THING_START_PLACE or type == RDL_THING_COOP_START_PLACE:
+            unknown = read_bytes(rdl, 139)
+
+            thing['start_number'] = thingType
+
+        elif type == RDL_THING_ITEM:
+            unknown = read_bytes(rdl, 6)
+            textureOverride = read_byte(rdl)
+            unknown = read_bytes(rdl, 9)
+
+            thing['type'] = thingType
+            thing['texture_override'] = textureOverride
+
+        elif type == RDL_THING_REACTOR:
+            unknown = read_bytes(rdl, 75)
+
+            thing['type'] = thingType
+
+        else:
+            raise Exception('Oops, wrong thing type: ' + str(type))
+
+        things[RDL_THINGS_TEXT[type]].append(thing)
+
+    return things
+
+
+def get_things_common(rdl):
+    thing = OrderedDict()
+
+    thing['control'] = read_byte(rdl)
+    thing['movement'] = read_byte(rdl)
+    thing['render'] = read_byte(rdl)
+    thing['flags'] = read_byte(rdl)
+    thing['cube'] = read_ushort(rdl)
+    thing['position'] = read_vector(rdl)
+    thing['orientation'] = []
+    thing['orientation'].append(read_vector(rdl))
+    thing['orientation'].append(read_vector(rdl))
+    thing['orientation'].append(read_vector(rdl))
+    thing['size'] = read_integer(rdl) / 65536.0
+    thing['shield'] = read_integer(rdl) / 65536.0
+    thing['last_position'] = read_vector(rdl)
+
+    return thing
+
+
 def read_byte(file):
     return struct.unpack('<b', file.read(1))[0]
+
+def read_bytes(file, max_submodels):
+    dict = OrderedDict()
+    for index in range(0, max_submodels):
+        dict[index] = read_byte(file)
+
+    return dict
 
 def read_ubyte(file):
     return struct.unpack('<B', file.read(1))[0]
