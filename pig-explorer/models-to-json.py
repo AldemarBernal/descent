@@ -18,13 +18,21 @@ def models_to_json(filename):
         if not os.path.exists(folder):
             os.makedirs(folder)
 
+        real_id = 0
+        excluded = []
         for id in range(0, models['num_polymodels']):
-            model = models['polymodels'][str(id)]
+            if models['polymodels'][str(id)]['simpler_model'] != '0':
+                excluded.append(int(models['polymodels'][str(id)]['simpler_model']))
 
-            model_file = os.path.join(folder, str(id)) + '.json'
+            if id + 1 not in excluded:
+                model = models['polymodels'][str(id)]
 
-            with open(model_file, 'w') as output:
-                json.dump(model, output)
+                model_file = os.path.join(folder, str(real_id)) + '.json'
+                real_id += 1
+
+                with open(model_file, 'w') as output:
+                    json.dump(model, output)
+
 
 if __name__ == "__main__":
 
